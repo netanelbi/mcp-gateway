@@ -19,6 +19,7 @@ import (
 
 	"github.com/docker/mcp-gateway/pkg/catalog"
 	"github.com/docker/mcp-gateway/pkg/codemode"
+	"github.com/docker/mcp-gateway/pkg/config"
 	"github.com/docker/mcp-gateway/pkg/log"
 	"github.com/docker/mcp-gateway/pkg/oci"
 	"github.com/docker/mcp-gateway/pkg/telemetry"
@@ -814,27 +815,34 @@ func (g *Gateway) createMcpConfigSetTool(_ *clientConfig) *ToolRegistration {
 					}
 
 					if secretsFilePath != "" {
-						// Read existing secrets
-						existingSecrets, _ := fbc.readSecretsFromFile(ctx, secretsFilePath)
-						if existingSecrets == nil {
-							existingSecrets = make(map[string]string)
-						}
-
-						// Update with new secret
-						existingSecrets[secretName] = secretValue
-
-						// Write back to file
-						var lines []string
-						for k, v := range existingSecrets {
-							lines = append(lines, fmt.Sprintf("%s=%s", k, v))
-						}
-						content := strings.Join(lines, "\n") + "\n"
-
-						if err := os.WriteFile(secretsFilePath, []byte(content), 0600); err != nil {
-							log.Log("Warning: Failed to write secrets file:", err)
-							persistMessage = " (Note: failed to persist to file)"
+						// Resolve relative paths to ~/.docker/mcp/
+						resolvedPath, err := config.FilePath(secretsFilePath)
+						if err != nil {
+							log.Log("Warning: Failed to resolve secrets path:", err)
+							persistMessage = " (Note: failed to resolve secrets path)"
 						} else {
-							persistMessage = fmt.Sprintf(" (persisted to %s)", secretsFilePath)
+							// Read existing secrets
+							existingSecrets, _ := fbc.readSecretsFromFile(ctx, secretsFilePath)
+							if existingSecrets == nil {
+								existingSecrets = make(map[string]string)
+							}
+
+							// Update with new secret
+							existingSecrets[secretName] = secretValue
+
+							// Write back to file
+							var lines []string
+							for k, v := range existingSecrets {
+								lines = append(lines, fmt.Sprintf("%s=%s", k, v))
+							}
+							content := strings.Join(lines, "\n") + "\n"
+
+							if err := os.WriteFile(resolvedPath, []byte(content), 0600); err != nil {
+								log.Log("Warning: Failed to write secrets file:", err)
+								persistMessage = " (Note: failed to persist to file)"
+							} else {
+								persistMessage = fmt.Sprintf(" (persisted to %s)", resolvedPath)
+							}
 						}
 					} else {
 						persistMessage = " (Note: no secrets file configured, secret only stored in memory)"

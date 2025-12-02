@@ -559,7 +559,13 @@ func (c *FileBasedConfiguration) readDockerDesktopSecrets(ctx context.Context, s
 func (c *FileBasedConfiguration) readSecretsFromFile(ctx context.Context, path string) (map[string]string, error) {
 	secrets := map[string]string{}
 
-	buf, err := os.ReadFile(path)
+	// Resolve relative paths to ~/.docker/mcp/
+	resolvedPath, err := config.FilePath(path)
+	if err != nil {
+		return nil, fmt.Errorf("resolving secrets path %s: %w", path, err)
+	}
+
+	buf, err := os.ReadFile(resolvedPath)
 	if err != nil {
 		return nil, fmt.Errorf("reading secrets from %s: %w", path, err)
 	}
