@@ -40,7 +40,7 @@ func rmSecretCommand() *cobra.Command {
 	var opts secret.RmOpts
 	cmd := &cobra.Command{
 		Use:   "rm name1 name2 ...",
-		Short: "Remove secrets from Docker Desktop's secret store",
+		Short: "Remove secrets from the secrets file",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := validateRmArgs(args, opts); err != nil {
 				return err
@@ -64,7 +64,7 @@ func listSecretCommand() *cobra.Command {
 	var opts secret.ListOptions
 	cmd := &cobra.Command{
 		Use:   "ls",
-		Short: "List all secret names in Docker Desktop's secret store",
+		Short: "List all secret names in the secrets file",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return secret.List(cmd.Context(), opts)
@@ -79,7 +79,7 @@ func setSecretCommand() *cobra.Command {
 	opts := &secret.SetOpts{}
 	cmd := &cobra.Command{
 		Use:     "set key[=value]",
-		Short:   "Set a secret in Docker Desktop's secret store",
+		Short:   "Set a secret in the secrets file",
 		Example: strings.Trim(setSecretExample, "\n"),
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {

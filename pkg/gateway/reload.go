@@ -106,7 +106,7 @@ func (g *Gateway) reloadConfiguration(ctx context.Context, configuration Configu
 		g.mcpServer.AddTool(mcpExecTool.Tool, mcpExecTool.Handler)
 		g.toolRegistrations[mcpExecTool.Tool.Name] = *mcpExecTool
 
-		// Add mcp-config-set tool
+		// Add mcp-config-set tool (also handles secrets with secret=true)
 		mcpConfigSetTool := g.createMcpConfigSetTool(clientConfig)
 		g.mcpServer.AddTool(mcpConfigSetTool.Tool, mcpConfigSetTool.Handler)
 		g.toolRegistrations[mcpConfigSetTool.Tool.Name] = *mcpConfigSetTool
@@ -114,7 +114,7 @@ func (g *Gateway) reloadConfiguration(ctx context.Context, configuration Configu
 		log.Log("  > mcp-find: tool for finding MCP servers in the catalog")
 		log.Log("  > mcp-add: tool for adding MCP servers to the registry")
 		log.Log("  > mcp-remove: tool for removing MCP servers from the registry")
-		log.Log("  > mcp-config-set: tool for setting configuration values for MCP servers")
+		log.Log("  > mcp-config-set: tool for setting config values (use secret=true for secrets)")
 		log.Log("  > code-mode: write code that calls other MCPs directly")
 		log.Log("  > mcp-exec: execute tools that exist in the current session")
 

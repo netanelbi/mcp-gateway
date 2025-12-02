@@ -6,7 +6,6 @@ import (
 	"fmt"
 
 	"github.com/docker/mcp-gateway/cmd/docker-mcp/secret-management/formatting"
-	"github.com/docker/mcp-gateway/pkg/desktop"
 )
 
 type ListOptions struct {
@@ -14,14 +13,19 @@ type ListOptions struct {
 }
 
 func List(ctx context.Context, opts ListOptions) error {
-	l, err := desktop.NewSecretsClient().ListJfsSecrets(ctx)
+	fs, err := NewFileSecrets()
+	if err != nil {
+		return err
+	}
+
+	l, err := fs.List(ctx)
 	if err != nil {
 		return err
 	}
 
 	if opts.JSON {
 		if len(l) == 0 {
-			l = []desktop.StoredSecret{} // Guarantee empty list (instead of displaying null)
+			l = []StoredSecret{} // Guarantee empty list (instead of displaying null)
 		}
 		jsonData, err := json.MarshalIndent(l, "", "  ")
 		if err != nil {

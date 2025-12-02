@@ -694,6 +694,7 @@ type configValue struct {
 	Server string `json:"server"`
 	Key    string `json:"key"`
 	Value  any    `json:"value"`
+	Secret bool   `json:"secret,omitempty"`
 }
 
 // formatConfigValue formats a config value for display, handling arrays, objects, and primitives
@@ -730,7 +731,7 @@ func formatConfigValue(value any) string {
 func (g *Gateway) createMcpConfigSetTool(_ *clientConfig) *ToolRegistration {
 	tool := &mcp.Tool{
 		Name:        "mcp-config-set",
-		Description: "Set configuration values for MCP servers. Creates or updates server configuration with the specified key-value pairs. Supports strings, numbers, booleans, objects, and arrays.",
+		Description: "Set configuration values for MCP servers. Creates or updates server configuration with the specified key-value pairs. Supports strings, numbers, booleans, objects, and arrays. Use secret=true to store the value in the secrets file instead of config.",
 		InputSchema: &jsonschema.Schema{
 			Type: "object",
 			Properties: map[string]*jsonschema.Schema{
@@ -747,12 +748,16 @@ func (g *Gateway) createMcpConfigSetTool(_ *clientConfig) *ToolRegistration {
 					Description: "Configuration value to set (can be string, number, boolean, object, or array)",
 					Items:       &jsonschema.Schema{Type: "object"},
 				},
+				"secret": {
+					Type:        "boolean",
+					Description: "If true, store the value in the secrets file instead of config. The secret name will be server.key (e.g., brave.api_key)",
+				},
 			},
 			Required: []string{"server", "key", "value"},
 		},
 	}
 
-	handler := func(_ context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	handler := func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		// Parse parameters
 		var params configValue
 
@@ -779,6 +784,72 @@ func (g *Gateway) createMcpConfigSetTool(_ *clientConfig) *ToolRegistration {
 
 		serverName := strings.TrimSpace(params.Server)
 		configKey := strings.TrimSpace(params.Key)
+
+		// Handle secret storage
+		if params.Secret {
+			secretValue, ok := params.Value.(string)
+			if !ok {
+				return nil, fmt.Errorf("secret values must be strings")
+			}
+
+			secretName := fmt.Sprintf("%s.%s", serverName, configKey)
+
+			// Update in-memory secrets
+			if g.configuration.secrets == nil {
+				g.configuration.secrets = make(map[string]string)
+			}
+			g.configuration.secrets[secretName] = secretValue
+
+			// Try to persist to secrets file
+			var persistMessage string
+			if g.configurator != nil {
+				if fbc, ok := g.configurator.(*FileBasedConfiguration); ok {
+					// Find the secrets file path (not docker-desktop)
+					secretsFilePath := ""
+					for secretPath := range strings.SplitSeq(fbc.SecretsPath, ":") {
+						if secretPath != "docker-desktop" && secretPath != "" {
+							secretsFilePath = secretPath
+							break
+						}
+					}
+
+					if secretsFilePath != "" {
+						// Read existing secrets
+						existingSecrets, _ := fbc.readSecretsFromFile(ctx, secretsFilePath)
+						if existingSecrets == nil {
+							existingSecrets = make(map[string]string)
+						}
+
+						// Update with new secret
+						existingSecrets[secretName] = secretValue
+
+						// Write back to file
+						var lines []string
+						for k, v := range existingSecrets {
+							lines = append(lines, fmt.Sprintf("%s=%s", k, v))
+						}
+						content := strings.Join(lines, "\n") + "\n"
+
+						if err := os.WriteFile(secretsFilePath, []byte(content), 0600); err != nil {
+							log.Log("Warning: Failed to write secrets file:", err)
+							persistMessage = " (Note: failed to persist to file)"
+						} else {
+							persistMessage = fmt.Sprintf(" (persisted to %s)", secretsFilePath)
+						}
+					} else {
+						persistMessage = " (Note: no secrets file configured, secret only stored in memory)"
+					}
+				}
+			}
+
+			log.Log(fmt.Sprintf("  - Set secret '%s'", secretName))
+
+			return &mcp.CallToolResult{
+				Content: []mcp.Content{&mcp.TextContent{
+					Text: fmt.Sprintf("Successfully set secret '%s'%s", secretName, persistMessage),
+				}},
+			}, nil
+		}
 
 		// Decode JSON-encoded values (e.g., arrays passed as strings)
 		finalValue := params.Value

@@ -6,7 +6,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/docker/mcp-gateway/pkg/desktop"
 	"github.com/docker/mcp-gateway/pkg/tui"
 )
 
@@ -54,17 +53,20 @@ func isDirectValueProvider(provider string) bool {
 }
 
 func Set(ctx context.Context, s Secret, opts SetOpts) error {
+	fs, err := NewFileSecrets()
+	if err != nil {
+		return err
+	}
+
+	// For credstore provider, also store in system credential store
 	if opts.Provider == Credstore {
 		p := NewCredStoreProvider()
 		if err := p.SetSecret(s.key, s.val); err != nil {
 			return err
 		}
 	}
-	return desktop.NewSecretsClient().SetJfsSecret(ctx, desktop.Secret{
-		Name:     s.key,
-		Value:    s.val,
-		Provider: opts.Provider,
-	})
+
+	return fs.Set(ctx, s.key, s.val)
 }
 
 func IsValidProvider(provider string) bool {

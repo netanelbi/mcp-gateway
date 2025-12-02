@@ -87,7 +87,26 @@ func (g *Gateway) createMcpAddTool(clientConfig *clientConfig) *ToolRegistration
 		// Fetch updated secrets for the new server list
 		if g.configurator != nil {
 			if fbc, ok := g.configurator.(*FileBasedConfiguration); ok {
-				updatedSecrets, err := fbc.readDockerDesktopSecrets(ctx, g.configuration.servers, g.configuration.serverNames)
+				var updatedSecrets map[string]string
+				var err error
+
+				// Use the same logic as readOnce - check SecretsPath
+				if fbc.SecretsPath == "docker-desktop" {
+					updatedSecrets, err = fbc.readDockerDesktopSecrets(ctx, g.configuration.servers, g.configuration.serverNames)
+				} else {
+					// Try each secrets path (colon-separated)
+					for secretPath := range strings.SplitSeq(fbc.SecretsPath, ":") {
+						if secretPath == "docker-desktop" {
+							updatedSecrets, err = fbc.readDockerDesktopSecrets(ctx, g.configuration.servers, g.configuration.serverNames)
+						} else {
+							updatedSecrets, err = fbc.readSecretsFromFile(ctx, secretPath)
+						}
+						if err == nil {
+							break
+						}
+					}
+				}
+
 				if err == nil {
 					g.configuration.secrets = updatedSecrets
 				} else {

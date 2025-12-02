@@ -51,7 +51,7 @@ func gatewayCommand(docker docker.Client, dockerCli command.Cli) *cobra.Command 
 			RegistryPath: []string{"registry.yaml"},
 			ConfigPath:   []string{"config.yaml"},
 			ToolsPath:    []string{"tools.yaml"},
-			SecretsPath:  "docker-desktop",
+			SecretsPath:  "secrets.env:docker-desktop",
 			Options: gateway.Options{
 				Cpus:         1,
 				Memory:       "2Gb",
